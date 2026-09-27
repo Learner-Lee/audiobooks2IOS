@@ -69,14 +69,32 @@ mkdir -p "$REVIEW_DIR"
 BASE="$(git rev-parse HEAD)"
 say "开始：分支=$BRANCH 目录=$WT 截止=$(date -r "$DEADLINE" 2>/dev/null || date -d "@$DEADLINE")"
 
-# 超时命令：Linux 自带 timeout，macOS 需 brew install coreutils 得到 gtimeout
+# 超时命令：Linux 自带 timeout，macOS 装了 coreutils 才有 gtimeout；都没有时用下面的内置看门狗
 if command -v timeout >/dev/null; then TO_BIN="timeout"
 elif command -v gtimeout >/dev/null; then TO_BIN="gtimeout"
-else TO_BIN=""; say "警告：没有 timeout/gtimeout，单次调用不设超时"; fi
+else TO_BIN=""; say "没有 timeout/gtimeout，使用内置看门狗限制单次调用时长"; fi
 
 with_timeout() {
   local secs="$1"; shift
-  if [ -n "$TO_BIN" ]; then "$TO_BIN" "$secs" "$@"; else "$@"; fi
+  if [ -n "$TO_BIN" ]; then "$TO_BIN" "$secs" "$@"; return; fi
+  # set -m 让命令自成一个进程组，超时时连同它启动的子进程一起结束（与 GNU timeout 的做法一致）。
+  # 只结束命令本身不够：遗留的子进程仍持有 $(...) 的输出管道，调用方会继续卡住
+  set -m
+  "$@" &
+  local pid=$!
+  set +m
+  # 看门狗：每秒检查一次，超时先 TERM、10 秒后 KILL；命令结束后 1 秒内自行退出。
+  # 用 "$BASH" -c 起一个新进程而不是 ( ... ) 子 shell：调用方的 2>&1 会让 bash 把原 stderr 备份到
+  # 高位描述符，子 shell 会继承这份备份并占住外层管道；exec 新进程时这类描述符会被自动关闭
+  "$BASH" -c '
+    pid=$1 secs=$2 t=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$t" -ge "$secs" ]; then
+        kill -TERM -- "-$pid" 2>/dev/null; sleep 10; kill -KILL -- "-$pid" 2>/dev/null; break
+      fi
+      sleep 1; t=$((t + 1))
+    done' night-watchdog "$pid" "$secs" </dev/null >/dev/null 2>&1 &
+  wait "$pid"
 }
 
 hit_limit() { printf '%s' "$1" | grep -qiE "$LIMIT_RE"; }

@@ -1,36 +1,24 @@
-# 当前任务：修复夜跑的三个阻断问题
+# 当前任务：加固 night-run.sh
 
-来源：2026-09-27 对 `night-run.sh` 的验证报告，修其中第 1、3、5 条。
+来源：2026-09-27 对 `night-run.sh` 的验证报告，修其中第 6、7、9、10 条。上一个任务（修第 1、3、5 条）的记录见 learning-log.md。
 
 ## 目标
 
-执行 `scripts/night-run.sh .` 能通过全部启动检查；夜跑中的 Claude 可以运行三项检查并 commit；Claude 和 Codex 都能读到本项目的 AGENTS.md。
+夜跑时单次调用卡住会被超时结束；勾选失败时停止而不是反复重做；agent 调用不受标准输入影响，审查结论读取可靠；worktree 不再建在其他项目旁边。
 
 ## 步骤
 
-- [x] 1. 调整目录结构：AGENTS.md、CLAUDE.md 移到项目根目录；env.example 移到 `server/.env.example`，env 移到 `server/.env`（不读内容）；night-run.sh 移到 `scripts/` 并加可执行权限；删除 `doc/`
-- [x] 2. 新建 `docs/ai/` 交接区：本文件、night-plan.md 模板（不含未勾选步骤）、night-log.md、learning-log.md、glossary.md
-- [x] 3. 新增项目级 `.claude/settings.json`：放行三项检查和必要的 git 命令，屏蔽 push/reset/rebase/clean/ssh/rsync 和读写 `.env`
+- [x] 6. `with_timeout`：没有 timeout/gtimeout 时用纯 bash 看门狗，不新增依赖
+- [ ] 7. `set_mark` 校验结果，失败时停止夜跑；`discard` 用变量保存 night-log，不依赖 mktemp
+- [ ] 9. `claude`/`codex` 调用加 `</dev/null`；Codex 用 `-o` 输出最终回复，只从中读取 VERDICT
+- [ ] 10. worktree 默认建在 `${NIGHT_WT_ROOT:-~/.night-worktrees}`，结束时打印清理命令
 
-## 不在范围内
-
-- 第 2 条：`~/.codex/config.toml` 缺 `[profiles.night-review]`（项目外文件，由用户修改）
-- 第 4 条的另一半：用相对路径 `bash night-run.sh` 启动仍然会失败，要用 `scripts/night-run.sh .` 这种带路径的方式启动
-- 第 6 到 12 条
+只改 `scripts/night-run.sh`。验证全部在 scratchpad 里用假的 claude/codex 进行。
 
 ## 进度记录
 
-### 步骤 1 · 调整目录结构（提交 54a87d0）
-- 用 git mv 移动 4 个已跟踪文件，git 识别为重命名；night-run.sh 已加可执行权限。
-- `doc/ai/env` 用 mv 移到 `server/.env`，未读取内容，大小和修改时间不变，已确认被 `.gitignore` 的 `.env` 规则忽略。
-- 坑：`doc/ai/.claude/.cc-writes` 是 Claude Code 在工作目录切到 doc/ai 时自动建的空目录；Finder 会反复生成 `.DS_Store`。两者都已清理。
-- 检查：`bash -n` 通过。pytest / ruff / mypy 暂无可运行对象（`server/` 里还没有代码）。
-
-### 步骤 2 · 新建 docs/ai 交接区
-- 新建 night-plan.md（模板）、night-log.md、learning-log.md、glossary.md，以及本文件。
-- 坑：脚本用 `grep '^- \[ \]'` 找步骤，不认 HTML 注释。所以 night-plan.md 的示例缩进 4 格放在代码块里，已验证没有顶格的未勾选步骤。
-
-### 步骤 3 · 项目级 .claude/settings.json
-- 放行：uv run pytest / ruff check / ruff format --check / mypy，以及 git status / diff / log / add / commit。
-- 禁止：git push / reset / rebase / clean、ssh、rsync，以及读写 `.env`。
-- 验证：JSON 能正常解析；保存后 Claude Code 立即把 `./server/.env`、`./**/.env` 加进了沙盒读取禁止列表，说明配置已被读取生效。
+### 步骤 6 · 内置超时
+- 没有 timeout/gtimeout 时，`with_timeout` 用纯 bash 看门狗：每秒检查一次，超时先 TERM、10 秒后 KILL。
+- 坑 1：只结束命令本身不够。它的子进程（假 claude 里的 sleep，真实环境里的 pytest 等）会变成孤儿，继续占着 `$(...)` 的输出管道。修法：用 `set -m` 让命令自成一个进程组，超时时 `kill -- -<pid>` 结束整组，与 GNU timeout 的做法一致。已实测：去掉进程组后脚本会卡住。
+- 坑 2：看门狗如果写成 `( ... ) &` 子 shell，会继承 bash 为函数级 `2>&1` 备份的原 stderr 描述符，脚本退出后还占着外层管道约 10 秒。修法：用 `"$BASH" -c` 启动新进程，exec 时这类描述符会被自动关闭。
+- 验证：假 claude 执行 `sleep 600`、ITER_TIMEOUT=3 时，每轮约 3 秒结束（退出码 143），两轮共 7 秒，结束后没有拖延；4 个回归场景结果不变。
