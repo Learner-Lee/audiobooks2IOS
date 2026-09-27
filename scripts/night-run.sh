@@ -62,8 +62,12 @@ git -C "$REPO" ls-files --error-unmatch "$PLAN" >/dev/null 2>&1 \
   || { say "$PLAN 还没有提交，worktree 里看不到它。请先 commit"; exit 1; }
 [ -z "$(git -C "$REPO" status --porcelain)" ] \
   || say "警告：主工作区有未提交的改动，夜跑只基于已提交的 HEAD"
-grep -q "^\[profiles\.$CODEX_PROFILE\]" "$HOME/.codex/config.toml" 2>/dev/null \
-  || say "警告：~/.codex/config.toml 里没找到 [profiles.$CODEX_PROFILE]"
+# 新版 Codex 的配置档是单独的 ~/.codex/<名称>.config.toml；config.toml 里残留旧写法的表时会拒绝启动
+[ -f "$HOME/.codex/$CODEX_PROFILE.config.toml" ] \
+  || say "警告：没找到 ~/.codex/$CODEX_PROFILE.config.toml（Codex 审查用的配置档）"
+if grep -q "^\[profiles\.$CODEX_PROFILE\]" "$HOME/.codex/config.toml" 2>/dev/null; then
+  say "警告：~/.codex/config.toml 里还有旧写法 [profiles.$CODEX_PROFILE]，新版 Codex 会因此拒绝启动，请删除"
+fi
 
 # ---------- 在独立 worktree + 新分支上工作，绝不碰当前分支 ----------
 git -C "$REPO" worktree add -q -b "$BRANCH" "$WT" HEAD || exit 1
