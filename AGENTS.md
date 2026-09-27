@@ -389,7 +389,7 @@ iOS：
 - 每一步的做法、关键决策和新概念只写进 `docs/ai/night-log.md`；`learning-log.md` 和 `glossary.md` 由白天整理，夜跑中不要求追加，审查也不把没追加这两个文件当作缺陷。
 - **不要勾选 night-plan 中的步骤。**勾选由 `night-run.sh` 在 Codex 审查通过后完成。
 - 每一步完成后由 Codex 只读审查，结论为 PASS 或 BLOCK。BLOCK 时按「处理审查意见」逐条处理：认同的阻断、应修项直接修复；不认同的应修项标为「分歧」写清论据，留给我决定；阻断项不能靠标为「分歧」跳过。
-- 每步最多三轮审查（`night-run.sh` 的 `REVIEW_ROUNDS` 默认值）。三轮后仍有阻断或应修，整晚任务停止，由我决定。本节的轮数规定优先于「处理审查意见」中的「最多来回两轮」。
+- 每步最多五轮审查（`night-run.sh` 的 `REVIEW_ROUNDS` 默认值）。五轮后仍有阻断或应修，整晚任务停止，由我决定。本节的轮数规定优先于「处理审查意见」中的「最多来回两轮」。
 - 夜跑审查文件命名：Codex 原始意见为 `reviews/night-<时间>-step<N>-r<轮>-codex.md`，处理结果为 `reviews/night-<时间>-step<N>-r<轮>.md`。
 - `docs/ai/` 必须纳入 git，night-plan.md 必须先提交，否则夜跑无法开始。
 - 不 push，不修改计划里的其他步骤，不调用任何 `/codex:*` 命令。

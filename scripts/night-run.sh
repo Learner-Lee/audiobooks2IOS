@@ -6,7 +6,7 @@
 # 可调环境变量:
 #   MAX_HOURS(默认6)  MAX_ITERS(默认30)  MAX_FAILS(默认3)
 #   ITER_TIMEOUT(Claude 单次秒数,默认2700)  REVIEW_TIMEOUT(Codex 单次秒数,默认1200)
-#   REVIEW_ROUNDS(每步最多审查轮数,默认3)  CODEX_PROFILE(默认 night-review)
+#   REVIEW_ROUNDS(每步最多审查轮数,默认5)  CODEX_PROFILE(默认 night-review)
 #   NIGHT_WT_ROOT(worktree 存放目录,默认 ~/.night-worktrees；放在项目外，避免加载上级目录的 CLAUDE.md)
 #
 # 每一步的流程:
@@ -29,7 +29,7 @@ MAX_ITERS="${MAX_ITERS:-30}"
 MAX_FAILS="${MAX_FAILS:-3}"
 ITER_TIMEOUT="${ITER_TIMEOUT:-2700}"
 REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-1200}"
-REVIEW_ROUNDS="${REVIEW_ROUNDS:-3}"
+REVIEW_ROUNDS="${REVIEW_ROUNDS:-5}"
 CODEX_PROFILE="${CODEX_PROFILE:-night-review}"
 PLAN="docs/ai/night-plan.md"
 LOG="docs/ai/night-log.md"
