@@ -1,0 +1,12 @@
+# 真实配置与密钥，绝不提交（模板 env.example 除外）
+.env
+.env.*
+!.env.example
+doc/ai/env
+
+# macOS
+.DS_Store
+
+# Claude Code 本地状态
+.claude/.cc-writes/
+.claude/settings.local.json
