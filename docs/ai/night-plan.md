@@ -25,7 +25,7 @@
 
 ### 阶段一：项目骨架与基础设施
 
-- [ ] 1. 初始化 server/ 的 uv 项目（Python 3.12），按 AGENTS.md「目录结构」建好 app/ 各子包和 tests/。依赖以本步为准（本计划即视为确认）：运行时 fastapi[standard]、pydantic-settings、sqlalchemy>=2、alembic、psycopg[binary]、celery、redis；开发 pytest、ruff、mypy。在 pyproject.toml 配置 ruff 和 mypy 严格模式（仅允许为缺少类型存根的 celery 设置 ignore_missing_imports）；新增 app/main.py，提供 GET /v1/health 返回 {"status": "ok"}；仓库 .gitignore 忽略 .env、.env.*（保留 .env.example）、`__pycache__`、.venv；测试覆盖 health 接口
+- [x] 1. 初始化 server/ 的 uv 项目（Python 3.12），按 AGENTS.md「目录结构」建好 app/ 各子包和 tests/。依赖以本步为准（本计划即视为确认）：运行时 fastapi[standard]、pydantic-settings、sqlalchemy>=2、alembic、psycopg[binary]、celery、redis；开发 pytest、ruff、mypy。在 pyproject.toml 配置 ruff 和 mypy 严格模式（仅允许为缺少类型存根的 celery 设置 ignore_missing_imports）；新增 app/main.py，提供 GET /v1/health 返回 {"status": "ok"}；仓库 .gitignore 忽略 .env、.env.*（保留 .env.example）、`__pycache__`、.venv；测试覆盖 health 接口
 - [ ] 2. 新增 server/docker-compose.yml：postgres（读取 .env 中的 POSTGRES_USER/PASSWORD/DB，端口 127.0.0.1:5432）、redis（127.0.0.1:6379）、测试专用 postgres-test（固定的非机密测试账号，端口 127.0.0.1:5433，数据用 tmpfs）。所有端口映射必须以 127.0.0.1 开头；测试库的连接串写入 server/.env.example 的 TEST_DATABASE_URL，作为第 6 步测试 fixture 的默认值
 - [ ] 3. 新增 app/core/config.py：用 pydantic-settings 读取 server/.env.example 中的全部配置项，类型和单位与注释一致；APP_ENV=production 时，必填项缺失、值为「<待填」开头或为 change-me 均启动报错；比例类配置校验取值范围（0 < LOW < HIGH < 1）；补充对应的 pytest 测试
 - [ ] 4. 新增 app/core/errors.py：AppError（含 code、message、HTTP 状态码）及 FastAPI 异常处理器，统一返回 {"code", "message"}；未捕获异常返回通用 500 且不泄露内部信息；测试覆盖业务错误、校验错误和未捕获异常三种情况
