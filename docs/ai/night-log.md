@@ -22,3 +22,6 @@
   - uv.lock：锁定所有依赖的精确版本，保证服务器与本机安装一致。
   - pydantic mypy 插件：让 mypy 理解 pydantic 模型的构造参数和字段类型。
 - 检查结果：`uv run pytest` 2 passed；`ruff check`、`ruff format --check` 通过；`mypy app` 无问题。
+
+## 2026-09-27 21:28:01 · night-run.sh
+- 步骤 1 经过 2 轮审查仍有阻断或应修问题，需要你决定。见 docs/ai/reviews/night-20260927-2124-step1-*
