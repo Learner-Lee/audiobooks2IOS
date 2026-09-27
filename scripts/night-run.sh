@@ -42,6 +42,7 @@ BRANCH="night/$STAMP"
 WT="$REPO/../${PROJ}-night-$STAMP"
 RUNLOG_DIR="$HOME/.night-runs"; mkdir -p "$RUNLOG_DIR"
 RUNLOG="$RUNLOG_DIR/${PROJ}-$STAMP.log"
+CODEX_OUT="$RUNLOG_DIR/${PROJ}-$STAMP-codex.out"   # 最近一次 Codex 的完整过程输出
 DEADLINE=$(( $(date +%s) + MAX_HOURS * 3600 ))
 
 say() { echo "[$(date '+%F %T')] $*" | tee -a "$RUNLOG"; }
@@ -210,7 +211,7 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
   say "第 $iter 轮开始：$body"
 
   # 1) Claude 实现
-  out="$(with_timeout "$ITER_TIMEOUT" claude -p "$(impl_prompt "$line")" --permission-mode acceptEdits 2>&1)"; code=$?
+  out="$(with_timeout "$ITER_TIMEOUT" claude -p "$(impl_prompt "$line")" --permission-mode acceptEdits </dev/null 2>&1)"; code=$?
   printf '%s\n' "$out" >> "$RUNLOG"
   if [ "$(git rev-parse HEAD)" = "$step_base" ]; then
     if hit_limit "$out"; then
@@ -235,11 +236,17 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
   while :; do
     raw="$REVIEW_DIR/$prefix-r$round-codex.md"
     say "步骤 $num 第 $round 轮 Codex 审查"
-    with_timeout "$REVIEW_TIMEOUT" codex exec --profile "$CODEX_PROFILE" \
-      "$(review_prompt "$line" "$step_base" "$prefix")" > "$raw" 2>>"$RUNLOG"; rcode=$?
-    verdict="$(grep -E '^[[:space:]]*VERDICT: (PASS|BLOCK)[[:space:]]*$' "$raw" | tail -n 1 | grep -oE 'PASS|BLOCK')"
+    # -o 只把 Codex 的最终回复写进审查文件，VERDICT 只从这里读；过程输出另存，用于判断额度和排查
+    rm -f "$raw"
+    with_timeout "$REVIEW_TIMEOUT" codex exec --profile "$CODEX_PROFILE" -o "$raw" \
+      "$(review_prompt "$line" "$step_base" "$prefix")" </dev/null >"$CODEX_OUT" 2>&1; rcode=$?
+    cat "$CODEX_OUT" >> "$RUNLOG"
+    verdict=""
+    [ -f "$raw" ] && verdict="$(grep -E '^[[:space:]]*VERDICT: (PASS|BLOCK)[[:space:]]*$' "$raw" | tail -n 1 | grep -oE 'PASS|BLOCK')"
+    # 结论读完再补记录：Codex 没写出最终回复时，把过程输出的末尾存进审查文件，保证每轮都有据可查
+    [ -s "$raw" ] || { echo "（Codex 没有写出最终回复，退出码 $rcode。以下是过程输出的最后 50 行）"; tail -n 50 "$CODEX_OUT"; } > "$raw"
     if [ -z "$verdict" ]; then
-      if [ "$rcode" -ne 0 ] && hit_limit "$(cat "$raw")"; then verdict="LIMIT"; else verdict="NONE"; fi
+      if [ "$rcode" -ne 0 ] && hit_limit "$(cat "$CODEX_OUT")"; then verdict="LIMIT"; else verdict="NONE"; fi
       commit_files "night-review: 步骤 $num 第 $round 轮审查没有结论（退出码 $rcode）" "$raw"
       break
     fi
@@ -251,7 +258,7 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
     proc="$REVIEW_DIR/$prefix-r$round.md"
     fix_base="$(git rev-parse HEAD)"
     say "步骤 $num 第 $round 轮 Claude 处理审查意见"
-    out="$(with_timeout "$ITER_TIMEOUT" claude -p "$(fix_prompt "$line" "$raw" "$proc")" --permission-mode acceptEdits 2>&1)"; code=$?
+    out="$(with_timeout "$ITER_TIMEOUT" claude -p "$(fix_prompt "$line" "$raw" "$proc")" --permission-mode acceptEdits </dev/null 2>&1)"; code=$?
     printf '%s\n' "$out" >> "$RUNLOG"
     if [ "$(git rev-parse HEAD)" = "$fix_base" ]; then
       if hit_limit "$out"; then verdict="CLAUDE_LIMIT"; else verdict="FIXFAIL"; fi
