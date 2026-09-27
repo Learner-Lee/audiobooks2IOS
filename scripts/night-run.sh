@@ -6,7 +6,7 @@
 # 可调环境变量:
 #   MAX_HOURS(默认6)  MAX_ITERS(默认30)  MAX_FAILS(默认3)
 #   ITER_TIMEOUT(Claude 单次秒数,默认2700)  REVIEW_TIMEOUT(Codex 单次秒数,默认1200)
-#   REVIEW_ROUNDS(每步最多审查轮数,默认2)  CODEX_PROFILE(默认 night-review)
+#   REVIEW_ROUNDS(每步最多审查轮数,默认3)  CODEX_PROFILE(默认 night-review)
 #   NIGHT_WT_ROOT(worktree 存放目录,默认 ~/.night-worktrees；放在项目外，避免加载上级目录的 CLAUDE.md)
 #
 # 每一步的流程:
@@ -29,7 +29,7 @@ MAX_ITERS="${MAX_ITERS:-30}"
 MAX_FAILS="${MAX_FAILS:-3}"
 ITER_TIMEOUT="${ITER_TIMEOUT:-2700}"
 REVIEW_TIMEOUT="${REVIEW_TIMEOUT:-1200}"
-REVIEW_ROUNDS="${REVIEW_ROUNDS:-2}"
+REVIEW_ROUNDS="${REVIEW_ROUNDS:-3}"
 CODEX_PROFILE="${CODEX_PROFILE:-night-review}"
 PLAN="docs/ai/night-plan.md"
 LOG="docs/ai/night-log.md"
@@ -172,6 +172,7 @@ $1
 先读 $REVIEW_DIR/ 下文件名以 $3 开头的已有记录（如果有）。对方已修复的问题不要重复提；对方标为「分歧」的应修项不要重复提；对方标为「分歧」的阻断项，如果你仍认为是阻断，重新列出并说明理由。
 
 对照检查：该步骤写明的完成标准是否真正达到；AGENTS.md 的代码规范和禁区；测试是否真正覆盖了本次改动的逻辑和边界情况；有没有做这一步以外的改动。
+夜跑中每一步只要求在 $LOG 记录做法和新概念，没有追加 docs/ai/learning-log.md 和 glossary.md 不算缺陷，不要因此提意见。
 
 每条意见给出：严重程度、位置（文件和行）、问题、在什么情况下造成什么后果、建议的修法。严重程度只用三种：
 - 阻断：会导致错误结果、数据丢失、安全问题，或违反禁区
