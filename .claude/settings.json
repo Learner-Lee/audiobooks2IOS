@@ -30,5 +30,13 @@
       "Edit(./server/.env)",
       "Edit(./**/.env)"
     ]
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["pypi.org", "files.pythonhosted.org"]
+    },
+    "filesystem": {
+      "allowWrite": ["~/.cache/uv"]
+    }
   }
 }
