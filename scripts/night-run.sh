@@ -51,7 +51,7 @@ say() { echo "[$(date '+%F %T')] $*" | tee -a "$RUNLOG"; }
 
 # ---------- 启动前检查 ----------
 for bin in git claude codex; do
-  command -v "$bin" >/dev/null || { say "找不到命令：$bin（检查 PATH）"; exit 1; }
+  command -v "$bin" >/dev/null || { say "找不到命令：${bin}（检查 PATH）"; exit 1; }
 done
 [ -f "$REPO/$PLAN" ] || { say "找不到 $REPO/$PLAN"; exit 1; }
 # 审查记录、日志、勾选都要进入提交历史，所以 docs/ai 必须被 git 跟踪
@@ -222,7 +222,7 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
     fi
     fails=$((fails + 1))
     discard "$step_base" "步骤 $num 未完成"
-    say "第 $iter 轮失败（退出码 $code），已回滚本轮改动"
+    say "第 $iter 轮失败（退出码 ${code}），已回滚本轮改动"
     continue
   fi
   say "步骤 $num 已实现：$(git log -1 --format=%s)"
@@ -246,10 +246,10 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
     verdict=""
     [ -f "$raw" ] && verdict="$(grep -E '^[[:space:]]*VERDICT: (PASS|BLOCK)[[:space:]]*$' "$raw" | tail -n 1 | grep -oE 'PASS|BLOCK')"
     # 结论读完再补记录：Codex 没写出最终回复时，把过程输出的末尾存进审查文件，保证每轮都有据可查
-    [ -s "$raw" ] || { echo "（Codex 没有写出最终回复，退出码 $rcode。以下是过程输出的最后 50 行）"; tail -n 50 "$CODEX_OUT"; } > "$raw"
+    [ -s "$raw" ] || { echo "（Codex 没有写出最终回复，退出码 ${rcode}。以下是过程输出的最后 50 行）"; tail -n 50 "$CODEX_OUT"; } > "$raw"
     if [ -z "$verdict" ]; then
       if [ "$rcode" -ne 0 ] && hit_limit "$(cat "$CODEX_OUT")"; then verdict="LIMIT"; else verdict="NONE"; fi
-      commit_files "night-review: 步骤 $num 第 $round 轮审查没有结论（退出码 $rcode）" "$raw"
+      commit_files "night-review: 步骤 $num 第 $round 轮审查没有结论（退出码 ${rcode}）" "$raw"
       break
     fi
     commit_files "night-review: 步骤 $num 第 $round 轮 Codex 审查 $verdict" "$raw"
@@ -279,7 +279,7 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
         log_note "步骤 $num 审查通过，但无法在计划中勾选（写文件失败或步骤原文被改动），已停止，请检查 $PLAN"
         reason="步骤 $num 勾选失败"; break
       fi
-      commit_files "night: 完成步骤 $num（Codex 审查通过）" "$PLAN"
+      commit_files "night: 完成步骤 ${num}（Codex 审查通过）" "$PLAN"
       fails=0
       say "步骤 $num 完成并勾选"
       ;;
@@ -307,7 +307,7 @@ done
 # ---------- 总结 ----------
 done_n=$(grep -c '^- \[x\]' "$PLAN" || true)
 left_n=$(grep -c '^- \[ \]' "$PLAN" || true)
-say "结束：$reason。共 $iter 轮，已完成步骤 $done_n，剩余 $left_n"
+say "结束：${reason}。共 $iter 轮，已完成步骤 ${done_n}，剩余 $left_n"
 say "本次提交：" ; git log --oneline "$BASE"..HEAD | tee -a "$RUNLOG"
 disputes=""
 for f in "$REVIEW_DIR"/night-"$STAMP"-*.md; do   # 只看 Claude 的处理结果，不看 Codex 原文
@@ -319,5 +319,5 @@ done
 say "早上请审查：git diff $BASE..$BRANCH （在 $REPO 中执行），完整日志：$RUNLOG"
 say "审查完可删除工作目录：git -C \"$REPO\" worktree remove \"$WT\""
 if [ "$(uname)" = "Darwin" ]; then
-  osascript -e "display notification \"$reason，完成 $done_n 步\" with title \"night-run: $PROJ\"" 2>/dev/null || true
+  osascript -e "display notification \"${reason}，完成 $done_n 步\" with title \"night-run: $PROJ\"" 2>/dev/null || true
 fi

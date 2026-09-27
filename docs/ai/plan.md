@@ -38,3 +38,10 @@
 ### 步骤 10 · worktree 移出上级目录
 - `WT="${NIGHT_WT_ROOT:-$HOME/.night-worktrees}/<项目>-night-<时间>"`，文件头的用法说明补上 NIGHT_WT_ROOT；结束时打印 `git worktree remove` 清理命令，不自动删除。
 - 验证：worktree 和 Claude 的工作目录都在（测试用的）~/.night-worktrees 下，仓库的上级目录里没有新目录；NIGHT_WT_ROOT 覆盖生效；12 个场景的全量回归通过；按真实方式（caffeinate 重新执行、绝对路径）运行正常。
+
+### 追加修复 · UTF-8 环境下变量名吞掉中文标点（用户首次试跑时发现）
+- 现象：`scripts/night-run.sh: line 310: reason?: unbound variable`。
+- 原因：macOS 的 bash 3.2 在 UTF-8 语言环境下，会把紧跟在 `$var` 后的中文标点（。，（ 等）的字节当成变量名的一部分，再加上 `set -u` 就直接退出。之前的测试用 `env -i` 跑，语言环境是 C，所以没覆盖到。
+- 影响：共 7 处，其中审查通过后的勾选提交也在内，任何一次真实夜跑都会在第一步通过时崩溃。
+- 修法：这 7 处统一改成 `${var}`。检查命令：`perl -ne 'print if /\$[A-Za-z_]\w*[^\x00-\x7F]/' scripts/night-run.sh`，应无输出。
+- 验证：在 en_NZ.UTF-8 下跑空计划、正常、Claude 失败、无结论、Codex 崩溃、Codex 额度、Claude 额度、mktemp 失败、超时、缺命令共 10 个场景，全部正常。
