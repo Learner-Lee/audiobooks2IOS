@@ -7,6 +7,7 @@
 #   MAX_HOURS(默认6)  MAX_ITERS(默认30)  MAX_FAILS(默认3)
 #   ITER_TIMEOUT(Claude 单次秒数,默认2700)  REVIEW_TIMEOUT(Codex 单次秒数,默认1200)
 #   REVIEW_ROUNDS(每步最多审查轮数,默认2)  CODEX_PROFILE(默认 night-review)
+#   NIGHT_WT_ROOT(worktree 存放目录,默认 ~/.night-worktrees；放在项目外，避免加载上级目录的 CLAUDE.md)
 #
 # 每一步的流程:
 #   Claude 实现并 commit（不勾选）
@@ -39,7 +40,8 @@ REPO="$(cd "$REPO" && git rev-parse --show-toplevel)" || exit 1
 PROJ="$(basename "$REPO")"
 STAMP="${STAMP:-$(date +%Y%m%d-%H%M)}"
 BRANCH="night/$STAMP"
-WT="$REPO/../${PROJ}-night-$STAMP"
+WT_ROOT="${NIGHT_WT_ROOT:-$HOME/.night-worktrees}"; mkdir -p "$WT_ROOT" || exit 1
+WT="$WT_ROOT/${PROJ}-night-$STAMP"
 RUNLOG_DIR="$HOME/.night-runs"; mkdir -p "$RUNLOG_DIR"
 RUNLOG="$RUNLOG_DIR/${PROJ}-$STAMP.log"
 CODEX_OUT="$RUNLOG_DIR/${PROJ}-$STAMP-codex.out"   # 最近一次 Codex 的完整过程输出
@@ -315,6 +317,7 @@ for f in "$REVIEW_DIR"/night-"$STAMP"-*.md; do   # 只看 Claude 的处理结果
 done
 [ -n "$disputes" ] && say "以下审查记录中有「分歧」项，需要你决定：" && printf '%s' "$disputes" | tee -a "$RUNLOG"
 say "早上请审查：git diff $BASE..$BRANCH （在 $REPO 中执行），完整日志：$RUNLOG"
+say "审查完可删除工作目录：git -C \"$REPO\" worktree remove \"$WT\""
 if [ "$(uname)" = "Darwin" ]; then
   osascript -e "display notification \"$reason，完成 $done_n 步\" with title \"night-run: $PROJ\"" 2>/dev/null || true
 fi

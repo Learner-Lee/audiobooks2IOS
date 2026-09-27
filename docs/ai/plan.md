@@ -11,7 +11,7 @@
 - [x] 6. `with_timeout`：没有 timeout/gtimeout 时用纯 bash 看门狗，不新增依赖
 - [x] 7. `set_mark` 校验结果，失败时停止夜跑；`discard` 用变量保存 night-log，不依赖 mktemp
 - [x] 9. `claude`/`codex` 调用加 `</dev/null`；Codex 用 `-o` 输出最终回复，只从中读取 VERDICT
-- [ ] 10. worktree 默认建在 `${NIGHT_WT_ROOT:-~/.night-worktrees}`，结束时打印清理命令
+- [x] 10. worktree 默认建在 `${NIGHT_WT_ROOT:-~/.night-worktrees}`，结束时打印清理命令
 
 只改 `scripts/night-run.sh`。验证全部在 scratchpad 里用假的 claude/codex 进行。
 
@@ -34,3 +34,7 @@
 - Codex 改用 `-o <审查文件>`，VERDICT 只从最终回复里读；过程输出存到 `~/.night-runs/<项目>-<时间>-codex.out` 并追加到运行日志，额度判断也基于它。
 - 顺序很重要：先读结论，再在审查文件为空时补上过程输出的末尾。反过来的话，回显里的「VERDICT: PASS」会被误读成结论。
 - 验证：标准输出写 BLOCK、-o 写 PASS 时判为 PASS；Codex 崩溃且回显了 VERDICT: PASS 时判为「没有结论」（旧版会误判为通过）；能识别额度用完；标准输入永不结束时 2 秒跑完；回归正常。
+
+### 步骤 10 · worktree 移出上级目录
+- `WT="${NIGHT_WT_ROOT:-$HOME/.night-worktrees}/<项目>-night-<时间>"`，文件头的用法说明补上 NIGHT_WT_ROOT；结束时打印 `git worktree remove` 清理命令，不自动删除。
+- 验证：worktree 和 Claude 的工作目录都在（测试用的）~/.night-worktrees 下，仓库的上级目录里没有新目录；NIGHT_WT_ROOT 覆盖生效；12 个场景的全量回归通过；按真实方式（caffeinate 重新执行、绝对路径）运行正常。
