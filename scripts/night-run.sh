@@ -99,15 +99,20 @@ with_timeout() {
 
 hit_limit() { printf '%s' "$1" | grep -qiE "$LIMIT_RE"; }
 
-# 把计划里某一步设为勾选(x)或未勾选(空格)。按步骤原文精确匹配，不依赖行号
+# 把计划里某一步设为勾选(x)或未勾选(空格)。按步骤原文精确匹配，不依赖行号。
+# 失败（临时文件、写回出错，或找不到这一行，例如 agent 改了步骤原文）时返回非 0，由调用方停止夜跑
 set_mark() {
-  local tmp; tmp="$(mktemp)"
-  BODY="$1" MARK="$2" awk '
+  local tmp
+  tmp="$(mktemp)" || return 1
+  if ! BODY="$1" MARK="$2" awk '
     !done && ($0 == "- [ ] " ENVIRON["BODY"] || $0 == "- [x] " ENVIRON["BODY"]) {
       print "- [" ENVIRON["MARK"] "] " ENVIRON["BODY"]; done = 1; next
     }
-    { print }' "$PLAN" > "$tmp" && cat "$tmp" > "$PLAN"
+    { print }' "$PLAN" > "$tmp" || ! cat "$tmp" > "$PLAN"; then
+    rm -f "$tmp"; return 1
+  fi
   rm -f "$tmp"
+  grep -Fxq -- "- [$2] $1" "$PLAN"
 }
 
 # 只提交指定文件；没有变化就跳过
@@ -117,17 +122,16 @@ commit_files() {
 }
 
 # 丢弃未提交的改动（含新建文件），但保留 agent 写进 night-log 的说明
+# （内容存在变量里而不是临时文件，临时文件建不了时也不会丢；末尾补 x 再去掉，是为了保留结尾换行）
 discard() {
-  local target="$1" note="$2" keep
-  keep="$(mktemp)"
-  [ -f "$LOG" ] && cp "$LOG" "$keep"
+  local target="$1" note="$2" keep=""
+  [ -f "$LOG" ] && { keep="$(cat "$LOG"; printf x)"; keep="${keep%x}"; }
   git reset -q --hard "$target"
   git clean -fdq
-  if [ -s "$keep" ]; then
-    cp "$keep" "$LOG"
+  if [ -n "$keep" ]; then
+    printf '%s' "$keep" > "$LOG"
     commit_files "night-log: $note" "$LOG"
   fi
-  rm -f "$keep"
 }
 
 log_note() {  # 脚本自己往 night-log 追加一条说明并提交
@@ -219,8 +223,11 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
     continue
   fi
   say "步骤 $num 已实现：$(git log -1 --format=%s)"
-  # 防止 agent 提前勾选
-  set_mark "$body" " "
+  # 防止 agent 提前勾选；确认不了就停，避免未审查的步骤以已勾选状态留在计划里
+  if ! set_mark "$body" " "; then
+    log_note "步骤 $num 实现后无法确认它在计划中为未勾选（写文件失败或步骤原文被改动），已停止，请检查 $PLAN"
+    reason="步骤 $num 勾选状态异常"; break
+  fi
   commit_files "night: 撤销步骤 $num 的提前勾选" "$PLAN"
 
   # 2) Codex 审查 ⇄ Claude 修复
@@ -251,7 +258,7 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
       discard "$fix_base" "步骤 $num 第 $round 轮修复未完成"
       break
     fi
-    set_mark "$body" " "
+    set_mark "$body" " " || { verdict="MARKFAIL"; break; }
     commit_files "night: 撤销步骤 $num 的提前勾选" "$PLAN"
     round=$((round + 1))
   done
@@ -259,7 +266,10 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
   # 3) 根据审查结果决定
   case "$verdict" in
     PASS)
-      set_mark "$body" "x"
+      if ! set_mark "$body" "x"; then   # 勾不上就停，否则下一轮会重新实现同一步
+        log_note "步骤 $num 审查通过，但无法在计划中勾选（写文件失败或步骤原文被改动），已停止，请检查 $PLAN"
+        reason="步骤 $num 勾选失败"; break
+      fi
       commit_files "night: 完成步骤 $num（Codex 审查通过）" "$PLAN"
       fails=0
       say "步骤 $num 完成并勾选"
@@ -276,6 +286,9 @@ while line="$(grep -m1 '^- \[ \]' "$PLAN")"; do
     CLAUDE_LIMIT)
       log_note "步骤 $num 修复过程中 Claude 额度用完，审查未通过"
       reason="Claude 撞到额度上限"; break ;;
+    MARKFAIL)
+      log_note "步骤 $num 第 $round 轮修复后无法确认它在计划中为未勾选，已停止，请检查 $PLAN"
+      reason="步骤 $num 勾选状态异常"; break ;;
     *)
       log_note "步骤 $num 的 Codex 审查没有给出结论，这一步未经审查。见 $REVIEW_DIR/$prefix-*"
       reason="步骤 $num 审查没有结论"; break ;;

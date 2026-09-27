@@ -9,7 +9,7 @@
 ## 步骤
 
 - [x] 6. `with_timeout`：没有 timeout/gtimeout 时用纯 bash 看门狗，不新增依赖
-- [ ] 7. `set_mark` 校验结果，失败时停止夜跑；`discard` 用变量保存 night-log，不依赖 mktemp
+- [x] 7. `set_mark` 校验结果，失败时停止夜跑；`discard` 用变量保存 night-log，不依赖 mktemp
 - [ ] 9. `claude`/`codex` 调用加 `</dev/null`；Codex 用 `-o` 输出最终回复，只从中读取 VERDICT
 - [ ] 10. worktree 默认建在 `${NIGHT_WT_ROOT:-~/.night-worktrees}`，结束时打印清理命令
 
@@ -22,3 +22,9 @@
 - 坑 1：只结束命令本身不够。它的子进程（假 claude 里的 sleep，真实环境里的 pytest 等）会变成孤儿，继续占着 `$(...)` 的输出管道。修法：用 `set -m` 让命令自成一个进程组，超时时 `kill -- -<pid>` 结束整组，与 GNU timeout 的做法一致。已实测：去掉进程组后脚本会卡住。
 - 坑 2：看门狗如果写成 `( ... ) &` 子 shell，会继承 bash 为函数级 `2>&1` 备份的原 stderr 描述符，脚本退出后还占着外层管道约 10 秒。修法：用 `"$BASH" -c` 启动新进程，exec 时这类描述符会被自动关闭。
 - 验证：假 claude 执行 `sleep 600`、ITER_TIMEOUT=3 时，每轮约 3 秒结束（退出码 143），两轮共 7 秒，结束后没有拖延；4 个回归场景结果不变。
+
+### 步骤 7 · 勾选失败时停止
+- `set_mark` 检查 mktemp、awk 和写回是否成功，最后用 `grep -Fxq` 确认目标行确实是期望的状态；任何一步失败都返回非 0。三处调用（撤销提前勾选、修复后撤销、审查通过后勾选）失败时都写入 night-log 并停止。
+- `discard` 用变量保存 night-log，末尾补 x 再去掉，以保留结尾换行，不再依赖 mktemp。
+- 验证：mktemp 失败时 1 轮即停（旧版重复实现 28 次）；mktemp 失败加 Claude 失败时，night-log 里的失败说明完整保留；agent 改了步骤原文时能识别出来并停止；回归正常。
+- 已知：这两种情况下总结行的「已完成步骤」包含 agent 提前打的勾，night-log 里已提示检查计划。
